@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "linspectacles-boot-timing",
+  "name": "Boot Timing",
+  "version": "0.0.10",
+  "author": "brunonlinespace",
+  "editor": "brunonlinespace",
+  "publisher": "brunonlinespace",
+  "organization_id": "linspectacles",
+  "organization_url": "https://github.com/linspectacles/",
+  "repository": "https://github.com/linspectacles/boot-timing",
+  "order": 10,
+  "entrypoint": "boot_timing/applet.py",
+  "factory": "create_applet",
+  "standalone": "standalone.py",
+  "description": "Experimental read-only systemd boot timing inspector with boot-wide Overall Timing analysis, explicit per-unit critical-path inspection, and lean selected-unit timing metadata.",
+  "platforms": [
+    "linux"
+  ],
+  "read_only": true
+}
