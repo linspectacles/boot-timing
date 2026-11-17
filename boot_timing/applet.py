@@ -6,7 +6,7 @@
 
 APPLET_ID = 'linspectacles-boot-timing'
 APPLET_NAME = 'Boot Timing'
-APPLET_VERSION = '0.0.10'
+APPLET_VERSION = '0.0.11'
 APPLET_AUTHOR = "brunonlinespace"
 APPLET_EDITOR = "brunonlinespace"
 APPLET_PUBLISHER = "brunonlinespace"
@@ -84,17 +84,17 @@ def _timing_details_canvas(owner):
     return widget
 
 
-def _timing_detail_formats():
+def _timing_detail_formats(privileged=False):
     key_format = QTextCharFormat()
-    key_format.setForeground(QColor("#9cdcfe"))
+    key_format.setForeground(QColor("#f2d18b" if privileged else "#9cdcfe"))
     key_format.setFontWeight(600)
     value_format = QTextCharFormat()
-    value_format.setForeground(QColor("#dcdcdc"))
+    value_format.setForeground(QColor("#e5bd70" if privileged else "#dcdcdc"))
     return key_format, value_format
 
 
-def _timing_append_heading(widget, heading):
-    key_format, value_format = _timing_detail_formats()
+def _timing_append_heading(widget, heading, privileged=False):
+    key_format, value_format = _timing_detail_formats(privileged)
     cursor = widget.textCursor()
     cursor.movePosition(QTextCursor.MoveOperation.End)
     if cursor.position() > 0:
@@ -103,8 +103,8 @@ def _timing_append_heading(widget, heading):
     widget.setTextCursor(cursor)
 
 
-def _timing_append_property(widget, key, value):
-    key_format, value_format = _timing_detail_formats()
+def _timing_append_property(widget, key, value, privileged=False):
+    key_format, value_format = _timing_detail_formats(privileged)
     cursor = widget.textCursor()
     cursor.movePosition(QTextCursor.MoveOperation.End)
     cursor.insertText(f"{key}: ", key_format)
@@ -165,6 +165,8 @@ class BootTimingDetailsDialog(QDialog):
         boot_log_page = QWidget()
         boot_log_layout = QVBoxLayout(boot_log_page)
         self.boot_log_canvas = _timing_details_canvas(owner)
+        self._boot_log_ordinary_stylesheet = self.boot_log_canvas.styleSheet()
+        self._boot_log_privileged_active = False
         boot_log_layout.addWidget(self.boot_log_canvas, 1)
 
         self.boot_log_privileged_btn = QPushButton("Privileged Access...")
@@ -172,7 +174,8 @@ class BootTimingDetailsDialog(QDialog):
         self.boot_log_privileged_btn.setVisible(False)
         boot_log_layout.addWidget(self.boot_log_privileged_btn, alignment=Qt.AlignmentFlag.AlignRight)
 
-        tabs.addTab(boot_log_page, "Boot Log")
+        self._boot_log_tab_index = tabs.addTab(boot_log_page, "Boot Log")
+        tabs.currentChanged.connect(self._on_timing_tab_changed)
         self._read_boot_log_ordinary()
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
@@ -180,21 +183,39 @@ class BootTimingDetailsDialog(QDialog):
         root.addWidget(buttons)
 
 
+    def _on_timing_tab_changed(self, index):
+        if index != self._boot_log_tab_index and self._boot_log_privileged_active:
+            self._read_boot_log_ordinary()
+
     def _show_boot_log(self, access, text, status=None):
+        privileged = self._boot_log_privileged_active
+        if privileged:
+            self.boot_log_canvas.setStyleSheet(
+                self._boot_log_ordinary_stylesheet
+                .replace("background-color: #151719;", "background-color: #1e1e1e;")
+                .replace("border: 1px solid #333333;", "border: 1px solid #d6a23d;")
+            )
+        else:
+            self.boot_log_canvas.setStyleSheet(self._boot_log_ordinary_stylesheet)
         self.boot_log_canvas.clear()
-        _timing_append_heading(self.boot_log_canvas, "Boot Log")
-        _timing_append_property(self.boot_log_canvas, "Source", "/var/log/boot.log")
-        _timing_append_property(self.boot_log_canvas, "Access", access)
+        _timing_append_heading(self.boot_log_canvas, "Boot Log", privileged=privileged)
+        _timing_append_property(self.boot_log_canvas, "Source", "/var/log/boot.log", privileged=privileged)
+        _timing_append_property(self.boot_log_canvas, "Access", access, privileged=privileged)
         if status:
-            _timing_append_property(self.boot_log_canvas, "Status", status)
+            _timing_append_property(self.boot_log_canvas, "Status", status, privileged=privileged)
         if text:
             cursor = self.boot_log_canvas.textCursor()
             cursor.movePosition(QTextCursor.MoveOperation.End)
-            cursor.insertText("\n" + text.rstrip() + "\n")
+            if privileged:
+                _, value_format = _timing_detail_formats(privileged=True)
+                cursor.insertText("\n" + text.rstrip() + "\n", value_format)
+            else:
+                cursor.insertText("\n" + text.rstrip() + "\n")
             self.boot_log_canvas.setTextCursor(cursor)
         _timing_scroll_top(self.boot_log_canvas)
 
     def _read_boot_log_ordinary(self):
+        self._boot_log_privileged_active = False
         path = Path("/var/log/boot.log")
         self.boot_log_privileged_btn.setVisible(False)
         if not path.exists():
@@ -243,6 +264,7 @@ class BootTimingDetailsDialog(QDialog):
             self._show_boot_log("Privileged", "", detail)
             return
         self.boot_log_privileged_btn.setVisible(False)
+        self._boot_log_privileged_active = True
         display_text = (result.stdout or "").replace("\x00", "")
         if not display_text.strip():
             self._show_boot_log("Privileged", "", "Privileged read completed, but the boot log is empty.")

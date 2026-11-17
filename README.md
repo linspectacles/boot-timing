@@ -4,7 +4,7 @@
 
 Boot Timing is a read-only systemd boot-timing inspector for boot-wide timing, per-unit durations and explicit critical-path analysis.
 
-Current release: **0.0.10**
+Current release: **0.0.11**
 
 Repository: <https://github.com/linspectacles/boot-timing>
 
